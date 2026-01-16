@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Bubble Shooter</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="logo-container">
+        <div class="logo">
+            <span class="logo-text logo-miami">MIAMI</span>
+            <span class="logo-text logo-bubble">BUBBLE</span>
+            <span class="logo-text logo-shooter">SHOOTER</span>
+        </div>
+    </div>
+    <div class="game-container">
+        <div class="game-header">
+            <div class="score-display">
+                <span>Score: <span id="score">0</span></span>
+            </div>
+            <div class="level-display">
+                <span>Level: <span id="level">1</span></span>
+            </div>
+            <button id="musicToggle" class="music-toggle" title="Toggle Music">
+                <span id="musicIcon">🎵</span>
+            </button>
+        </div>
+        
+        <canvas id="gameCanvas"></canvas>
+        
+        <audio id="backgroundMusic" loop preload="auto" playsinline>
+            <source src="pixel_pulse.mp3" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio>
+        
+        <div class="game-controls">
+            <div class="next-bubble-label">Next:</div>
+            <canvas id="nextBubbleCanvas" width="60" height="60"></canvas>
+        </div>
+        
+        <div class="play-overlay" id="playOverlay">
+            <div class="overlay-content play-overlay-content">
+                <p class="game-subtitle">Match bubbles to clear the board!</p>
+                <button id="playButton" class="btn-play">
+                    <span class="play-icon">▶</span>
+                    <span class="play-text">Play</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="game-overlay" id="gameOverlay">
+            <div class="overlay-content">
+                <h2 id="overlayTitle">Game Over</h2>
+                <p id="overlayMessage">Final Score: <span id="finalScore">0</span></p>
+                <button id="restartButton" class="btn-primary">Play Again</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="game.js"></script>
+</body>
+</html>
