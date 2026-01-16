@@ -7,7 +7,7 @@ function isMobileDevice() {
 // Game Configuration
 const CONFIG = {
     BUBBLE_RADIUS: isMobileDevice() ? 18 : 20,
-    ROWS: isMobileDevice() ? 5 : 10, // Further reduced rows for mobile performance
+    ROWS: isMobileDevice() ? 7 : 10, // 2 more rows for mobile
     COLUMNS: isMobileDevice() ? 8 : 12, // Further reduced columns for mobile performance
     COLORS: ['#00ffff', '#d946ef', '#8a2be2', '#00ff00', '#fde047', '#ff0000'], // Neon club colors: cyan, pink, blueviolet, green, yellow, red
     SHOOTER_Y_OFFSET: isMobileDevice() ? 40 : 50,
@@ -20,11 +20,11 @@ const CONFIG = {
 // Level configuration - calculates difficulty based on level
 function getLevelConfig(level) {
     const isMobile = isMobileDevice();
-    const baseRows = isMobile ? 5 : 10;
+    const baseRows = isMobile ? 7 : 10; // 2 more rows for mobile
     
     // Increase rows by 1-2 every 3 levels, with a maximum
     const rowIncrease = Math.floor((level - 1) / 3);
-    const maxRows = isMobile ? 8 : 15; // Cap at reasonable maximum
+    const maxRows = isMobile ? 10 : 15; // Cap at reasonable maximum (increased for mobile)
     const rows = Math.min(baseRows + rowIncrease, maxRows);
     
     return {
@@ -319,11 +319,11 @@ window.addEventListener('resize', () => {
     // Recalculate mobile settings on resize (e.g., device rotation)
     if (gameState.bubbles.length === 0) {
         // Only update config if game hasn't started
-        const wasMobile = CONFIG.ROWS === 5;
+        const wasMobile = CONFIG.ROWS === 7;
         const isNowMobile = isMobileDevice();
         if (wasMobile !== isNowMobile) {
             CONFIG.BUBBLE_RADIUS = isNowMobile ? 18 : 20;
-            CONFIG.ROWS = isNowMobile ? 5 : 10;
+            CONFIG.ROWS = isNowMobile ? 7 : 10;
             CONFIG.COLUMNS = isNowMobile ? 8 : 12;
             CONFIG.SHOOTER_Y_OFFSET = isNowMobile ? 40 : 50;
             CONFIG.BUBBLE_SPEED = isNowMobile ? 12 : 8;
