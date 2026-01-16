@@ -7,15 +7,32 @@ function isMobileDevice() {
 // Game Configuration
 const CONFIG = {
     BUBBLE_RADIUS: isMobileDevice() ? 18 : 20,
-    ROWS: isMobileDevice() ? 6 : 10, // Reduced rows for mobile
-    COLUMNS: isMobileDevice() ? 10 : 12, // Reduced columns for mobile
+    ROWS: isMobileDevice() ? 5 : 10, // Further reduced rows for mobile performance
+    COLUMNS: isMobileDevice() ? 8 : 12, // Further reduced columns for mobile performance
     COLORS: ['#00ffff', '#d946ef', '#8a2be2', '#00ff00', '#fde047', '#ff0000'], // Neon club colors: cyan, pink, blueviolet, green, yellow, red
     SHOOTER_Y_OFFSET: isMobileDevice() ? 40 : 50,
     GRAVITY: 0.3,
-    BUBBLE_SPEED: 8,
+    BUBBLE_SPEED: isMobileDevice() ? 12 : 8, // Faster on mobile to compensate for Safari's potential frame rate throttling
     WALL_BOUNCE: 0.8,
     SOUND_ENABLED: true
 };
+
+// Level configuration - calculates difficulty based on level
+function getLevelConfig(level) {
+    const isMobile = isMobileDevice();
+    const baseRows = isMobile ? 5 : 10;
+    
+    // Increase rows by 1-2 every 3 levels, with a maximum
+    const rowIncrease = Math.floor((level - 1) / 3);
+    const maxRows = isMobile ? 8 : 15; // Cap at reasonable maximum
+    const rows = Math.min(baseRows + rowIncrease, maxRows);
+    
+    return {
+        rows: rows,
+        // Slightly reduce color variety on higher levels (more challenge)
+        colorVariety: level <= 5 ? CONFIG.COLORS.length : Math.max(4, CONFIG.COLORS.length - Math.floor((level - 5) / 5))
+    };
+}
 
 // Sound Manager using Web Audio API
 const SoundManager = {
@@ -254,14 +271,26 @@ const gameState = {
     score: 0,
     level: 1,
     gameOver: false,
-    gameWon: false
+    gameWon: false,
+    rowsEliminated: 0, // Track how many rows have been eliminated
+    initialTopY: 60 // Track the initial top Y position
 };
 
 // Canvas Setup
 const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { 
+    alpha: false, // Disable alpha for better performance on Safari
+    desynchronized: true // Allow async rendering for better performance
+});
 const nextCanvas = document.getElementById('nextBubbleCanvas');
 const nextCtx = nextCanvas.getContext('2d');
+
+// Optimize canvas for Safari mobile performance
+if (isMobileDevice()) {
+    // Use willReadFrequently hint for better performance
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+}
 
 // Set canvas size
 function resizeCanvas() {
@@ -290,13 +319,14 @@ window.addEventListener('resize', () => {
     // Recalculate mobile settings on resize (e.g., device rotation)
     if (gameState.bubbles.length === 0) {
         // Only update config if game hasn't started
-        const wasMobile = CONFIG.ROWS === 6;
+        const wasMobile = CONFIG.ROWS === 5;
         const isNowMobile = isMobileDevice();
         if (wasMobile !== isNowMobile) {
             CONFIG.BUBBLE_RADIUS = isNowMobile ? 18 : 20;
-            CONFIG.ROWS = isNowMobile ? 6 : 10;
-            CONFIG.COLUMNS = isNowMobile ? 10 : 12;
+            CONFIG.ROWS = isNowMobile ? 5 : 10;
+            CONFIG.COLUMNS = isNowMobile ? 8 : 12;
             CONFIG.SHOOTER_Y_OFFSET = isNowMobile ? 40 : 50;
+            CONFIG.BUBBLE_SPEED = isNowMobile ? 12 : 8;
         }
     }
 });
@@ -317,102 +347,135 @@ class Bubble {
     }
     
     draw() {
-        ctx.save();
+        const isMobile = isMobileDevice();
         
-        // Base glass ball - brighter and more transparent with color tint
-        const baseGradient = ctx.createRadialGradient(
-            this.x - this.radius * 0.2,
-            this.y - this.radius * 0.2,
-            0,
-            this.x,
-            this.y,
-            this.radius
-        );
-        baseGradient.addColorStop(0, this.colorToRGBA(this.color, 0.5));
-        baseGradient.addColorStop(0.5, this.colorToRGBA(this.color, 0.6));
-        baseGradient.addColorStop(1, this.colorToRGBA(this.color, 0.7));
-        
-        ctx.fillStyle = baseGradient;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Lighter rim at bottom for subtle 3D depth
-        const rimGradient = ctx.createLinearGradient(
-            this.x, this.y - this.radius,
-            this.x, this.y + this.radius
-        );
-        rimGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        rimGradient.addColorStop(0.8, 'rgba(0, 0, 0, 0.03)');
-        rimGradient.addColorStop(0.9, 'rgba(0, 0, 0, 0.08)');
-        rimGradient.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
-        
-        ctx.fillStyle = rimGradient;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Main highlight - bright white reflection at top-left
-        const highlightGradient = ctx.createRadialGradient(
-            this.x - this.radius * 0.4,
-            this.y - this.radius * 0.4,
-            0,
-            this.x - this.radius * 0.4,
-            this.y - this.radius * 0.4,
-            this.radius * 0.6
-        );
-        highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-        highlightGradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.7)');
-        highlightGradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.3)');
-        highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        
-        ctx.fillStyle = highlightGradient;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Secondary smaller highlight for more realism
-        const smallHighlight = ctx.createRadialGradient(
-            this.x - this.radius * 0.25,
-            this.y - this.radius * 0.5,
-            0,
-            this.x - this.radius * 0.25,
-            this.y - this.radius * 0.5,
-            this.radius * 0.3
-        );
-        smallHighlight.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-        smallHighlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        
-        ctx.fillStyle = smallHighlight;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Edge highlight - rim light for glass effect
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius - 0.5, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // Lighter inner shadow at bottom for subtle depth
-        const innerShadow = ctx.createRadialGradient(
-            this.x,
-            this.y + this.radius * 0.3,
-            0,
-            this.x,
-            this.y + this.radius * 0.3,
-            this.radius * 0.7
-        );
-        innerShadow.addColorStop(0, 'rgba(0, 0, 0, 0.08)');
-        innerShadow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        
-        ctx.fillStyle = innerShadow;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius * 0.9, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.restore();
+        if (isMobile) {
+            // Simplified rendering for mobile performance
+            ctx.save();
+            
+            // Simple base circle with color
+            ctx.fillStyle = this.colorToRGBA(this.color, 0.7);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Single highlight for glass effect
+            const highlight = ctx.createRadialGradient(
+                this.x - this.radius * 0.4,
+                this.y - this.radius * 0.4,
+                0,
+                this.x - this.radius * 0.4,
+                this.y - this.radius * 0.4,
+                this.radius * 0.6
+            );
+            highlight.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+            highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.fillStyle = highlight;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        } else {
+            // Full glass effect for desktop
+            ctx.save();
+            
+            // Base glass ball - brighter and more transparent with color tint
+            const baseGradient = ctx.createRadialGradient(
+                this.x - this.radius * 0.2,
+                this.y - this.radius * 0.2,
+                0,
+                this.x,
+                this.y,
+                this.radius
+            );
+            baseGradient.addColorStop(0, this.colorToRGBA(this.color, 0.5));
+            baseGradient.addColorStop(0.5, this.colorToRGBA(this.color, 0.6));
+            baseGradient.addColorStop(1, this.colorToRGBA(this.color, 0.7));
+            
+            ctx.fillStyle = baseGradient;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Lighter rim at bottom for subtle 3D depth
+            const rimGradient = ctx.createLinearGradient(
+                this.x, this.y - this.radius,
+                this.x, this.y + this.radius
+            );
+            rimGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            rimGradient.addColorStop(0.8, 'rgba(0, 0, 0, 0.03)');
+            rimGradient.addColorStop(0.9, 'rgba(0, 0, 0, 0.08)');
+            rimGradient.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+            
+            ctx.fillStyle = rimGradient;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Main highlight - bright white reflection at top-left
+            const highlightGradient = ctx.createRadialGradient(
+                this.x - this.radius * 0.4,
+                this.y - this.radius * 0.4,
+                0,
+                this.x - this.radius * 0.4,
+                this.y - this.radius * 0.4,
+                this.radius * 0.6
+            );
+            highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+            highlightGradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.7)');
+            highlightGradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.3)');
+            highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.fillStyle = highlightGradient;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Secondary smaller highlight for more realism
+            const smallHighlight = ctx.createRadialGradient(
+                this.x - this.radius * 0.25,
+                this.y - this.radius * 0.5,
+                0,
+                this.x - this.radius * 0.25,
+                this.y - this.radius * 0.5,
+                this.radius * 0.3
+            );
+            smallHighlight.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+            smallHighlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.fillStyle = smallHighlight;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Edge highlight - rim light for glass effect
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius - 0.5, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Lighter inner shadow at bottom for subtle depth
+            const innerShadow = ctx.createRadialGradient(
+                this.x,
+                this.y + this.radius * 0.3,
+                0,
+                this.x,
+                this.y + this.radius * 0.3,
+                this.radius * 0.7
+            );
+            innerShadow.addColorStop(0, 'rgba(0, 0, 0, 0.08)');
+            innerShadow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            
+            ctx.fillStyle = innerShadow;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius * 0.9, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
     }
     
     colorToRGBA(color, alpha) {
@@ -461,42 +524,69 @@ class Bubble {
 }
 
 // Initialize game grid
-function initGame() {
+function initGame(resetLevel = false) {
+    // Reset level to 1 if starting fresh, otherwise keep current level
+    if (resetLevel) {
+        gameState.level = 1;
+    }
+    
     gameState.bubbles = [];
     gameState.fallingBubbles = [];
+    gameState.poppingBubbles = [];
     gameState.shooting = false;
     gameState.gameOver = false;
     gameState.gameWon = false;
     gameState.score = 0;
+    gameState.rowsEliminated = 0;
+    gameState.lastTopY = null; // Track last checked top Y position
+    gameState.totalRowsEliminated = 0; // Track total rows eliminated (for compensation)
+    
+    // Get level-specific configuration
+    const levelConfig = getLevelConfig(gameState.level);
+    const rowsForLevel = levelConfig.rows;
+    const availableColors = CONFIG.COLORS.slice(0, levelConfig.colorVariety);
     
     // Create initial bubble grid
     const startY = 60;
+    gameState.initialTopY = startY;
+    gameState.lastTopY = startY; // Initialize last checked top Y
     const spacing = CONFIG.BUBBLE_RADIUS * 2;
     
-    for (let row = 0; row < CONFIG.ROWS; row++) {
+    // Calculate how many columns fit and center the grid
+    for (let row = 0; row < rowsForLevel; row++) {
         const offsetX = row % 2 === 1 ? CONFIG.BUBBLE_RADIUS : 0;
-        for (let col = 0; col < CONFIG.COLUMNS; col++) {
-            const x = offsetX + col * spacing + CONFIG.BUBBLE_RADIUS;
+        
+        // Calculate how many columns can fit in the canvas width
+        const availableWidth = canvas.width - offsetX;
+        const maxCols = Math.floor(availableWidth / spacing);
+        
+        // Center the grid horizontally
+        const totalGridWidth = maxCols * spacing;
+        const startX = offsetX + (canvas.width - totalGridWidth) / 2;
+        
+        for (let col = 0; col < maxCols; col++) {
+            const x = startX + col * spacing + CONFIG.BUBBLE_RADIUS;
             const y = startY + row * spacing * 0.866; // Hexagonal spacing
             
-            if (x + CONFIG.BUBBLE_RADIUS <= canvas.width) {
-                const color = CONFIG.COLORS[Math.floor(Math.random() * CONFIG.COLORS.length)];
+            // Ensure bubble fits within canvas
+            if (x + CONFIG.BUBBLE_RADIUS <= canvas.width && x - CONFIG.BUBBLE_RADIUS >= 0) {
+                const color = availableColors[Math.floor(Math.random() * availableColors.length)];
                 gameState.bubbles.push(new Bubble(x, y, color, col, row));
             }
         }
     }
     
-    // Create shooter and next bubble
-    createShooterBubble();
-    createNextBubble();
+    // Create shooter and next bubble (using available colors for level)
+    createShooterBubble(availableColors);
+    createNextBubble(availableColors);
     
     updateUI();
     draw();
 }
 
 // Create shooter bubble
-function createShooterBubble() {
-    const color = CONFIG.COLORS[Math.floor(Math.random() * CONFIG.COLORS.length)];
+function createShooterBubble(availableColors = CONFIG.COLORS) {
+    const color = availableColors[Math.floor(Math.random() * availableColors.length)];
     gameState.shooterBubble = new Bubble(
         canvas.width / 2,
         canvas.height - CONFIG.SHOOTER_Y_OFFSET,
@@ -505,8 +595,8 @@ function createShooterBubble() {
 }
 
 // Create next bubble preview
-function createNextBubble() {
-    const color = CONFIG.COLORS[Math.floor(Math.random() * CONFIG.COLORS.length)];
+function createNextBubble(availableColors = CONFIG.COLORS) {
+    const color = availableColors[Math.floor(Math.random() * availableColors.length)];
     gameState.nextBubble = { color };
     
     // Draw next bubble preview as glass ball
@@ -624,12 +714,24 @@ function shootBubble() {
     gameState.shooting = true;
     const bubble = gameState.shooterBubble;
     
-    bubble.vx = Math.cos(aimAngle) * CONFIG.BUBBLE_SPEED;
-    bubble.vy = Math.sin(aimAngle) * CONFIG.BUBBLE_SPEED;
+    const speed = CONFIG.BUBBLE_SPEED;
+    bubble.vx = Math.cos(aimAngle) * speed;
+    bubble.vy = Math.sin(aimAngle) * speed;
     
-    function animate() {
-        bubble.x += bubble.vx;
-        bubble.y += bubble.vy;
+    let lastTime = performance.now();
+    
+    function animate(currentTime) {
+        // Time-based movement for consistent speed across devices (especially Safari mobile)
+        const deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
+        
+        // Use fixed timestep for consistent physics (60fps = ~16.67ms per frame)
+        const fixedDelta = 16.67;
+        const timeScale = Math.min(deltaTime / fixedDelta, 3); // Cap at 3x to prevent large jumps but allow faster movement on slow devices
+        
+        // Move bubble based on time (ensures consistent speed even if FPS drops)
+        bubble.x += bubble.vx * timeScale;
+        bubble.y += bubble.vy * timeScale;
         
         // Check wall collisions
         if (bubble.x - bubble.radius < 0 || bubble.x + bubble.radius > canvas.width) {
@@ -657,15 +759,15 @@ function shootBubble() {
         
         // Continue if bubble is still moving
         if (bubble.y < canvas.height) {
-            requestAnimationFrame(animate);
             draw();
+            requestAnimationFrame(animate);
         } else {
             // Bubble fell off screen - game over
             endGame(false);
         }
     }
     
-    animate();
+    requestAnimationFrame(animate);
 }
 
 // Snap bubble to grid position
@@ -685,11 +787,14 @@ function snapBubbleToGrid(bubble, collisionBubble = null) {
         const offsetX = row % 2 === 1 ? CONFIG.BUBBLE_RADIUS : 0;
         const y = startY + row * hexHeight;
         
-        // Calculate how many columns fit
-        const maxCols = Math.floor((canvas.width - offsetX) / spacing);
+        // Calculate how many columns fit and center the grid
+        const availableWidth = canvas.width - offsetX;
+        const maxCols = Math.floor(availableWidth / spacing);
+        const totalGridWidth = maxCols * spacing;
+        const startX = offsetX + (canvas.width - totalGridWidth) / 2;
         
         for (let col = 0; col < maxCols; col++) {
-            const x = offsetX + col * spacing + CONFIG.BUBBLE_RADIUS;
+            const x = startX + col * spacing + CONFIG.BUBBLE_RADIUS;
             
             // Check if this position is too close to existing bubbles
             let tooClose = false;
@@ -769,13 +874,16 @@ function snapBubbleToGrid(bubble, collisionBubble = null) {
         return;
     }
     
-    // Prepare next shot
+    // Prepare next shot - get available colors for current level
+    const levelConfig = getLevelConfig(gameState.level);
+    const availableColors = CONFIG.COLORS.slice(0, levelConfig.colorVariety);
+    
     gameState.shooterBubble = new Bubble(
         canvas.width / 2,
         canvas.height - CONFIG.SHOOTER_Y_OFFSET,
         gameState.nextBubble.color
     );
-    createNextBubble();
+    createNextBubble(availableColors);
     gameState.shooting = false;
     draw();
 }
@@ -825,6 +933,9 @@ function checkMatches(startBubble) {
                 endGame(true);
                 return;
             }
+            
+            // Check if rows have been eliminated and add new rows if needed
+            checkAndAddRows();
         }, 200); // Wait for pop animation
     }
 }
@@ -934,7 +1045,108 @@ function checkDisconnectedBubbles() {
         
         updateUI();
         animateFallingBubbles();
+        
+        // Check if rows have been eliminated and add new rows if needed
+        checkAndAddRows();
     }
+}
+
+// Check if rows have been eliminated and add new rows
+function checkAndAddRows() {
+    if (gameState.bubbles.length === 0) return;
+    
+    const spacing = CONFIG.BUBBLE_RADIUS * 2;
+    const hexHeight = spacing * 0.866;
+    const tolerance = hexHeight * 0.2;
+    
+    // Find the current top Y position of remaining bubbles
+    const currentTopY = Math.min(...gameState.bubbles.map(b => b.y));
+    
+    // Group bubbles by row (round Y to nearest row position)
+    const rowMap = new Map();
+    gameState.bubbles.forEach(bubble => {
+        const rowY = Math.round((bubble.y - gameState.initialTopY) / hexHeight) * hexHeight + gameState.initialTopY;
+        const rowKey = Math.round(rowY);
+        if (!rowMap.has(rowKey)) {
+            rowMap.set(rowKey, []);
+        }
+        rowMap.get(rowKey).push(bubble);
+    });
+    
+    // Get all row Y positions sorted
+    const sortedRowYs = Array.from(rowMap.keys()).sort((a, b) => a - b);
+    
+    // Calculate how many rows down from initial top the current top is
+    const topRowY = sortedRowYs[0];
+    const rowsDown = (topRowY - gameState.initialTopY) / hexHeight;
+    
+    // Calculate how many rows we've already compensated for
+    const rowsCompensated = gameState.totalRowsEliminated;
+    
+    // If we have 2+ uncompensated rows, add 2 new rows
+    if (rowsDown - rowsCompensated >= 2) {
+        const newStartY = addNewRows(2);
+        gameState.totalRowsEliminated += 2;
+        gameState.initialTopY = newStartY;
+        gameState.lastTopY = newStartY;
+    } else if (gameState.lastTopY === null) {
+        gameState.lastTopY = currentTopY;
+    }
+}
+
+// Add new rows at the top of the grid
+function addNewRows(numRows) {
+    if (gameState.bubbles.length === 0) return;
+    
+    // Get level-specific configuration
+    const levelConfig = getLevelConfig(gameState.level);
+    const availableColors = CONFIG.COLORS.slice(0, levelConfig.colorVariety);
+    
+    // Find the current top Y position before shifting
+    const currentTopY = Math.min(...gameState.bubbles.map(b => b.y));
+    const spacing = CONFIG.BUBBLE_RADIUS * 2;
+    const hexHeight = spacing * 0.866;
+    
+    // Calculate starting Y for new rows (above current top)
+    const newStartY = currentTopY - (numRows * hexHeight);
+    
+    // Shift all existing bubbles down
+    gameState.bubbles.forEach(bubble => {
+        bubble.y += numRows * hexHeight;
+    });
+    
+    // Add new rows at the top
+    for (let row = 0; row < numRows; row++) {
+        const offsetX = (row % 2 === 1) ? CONFIG.BUBBLE_RADIUS : 0;
+        
+        // Calculate how many columns can fit in the canvas width
+        const availableWidth = canvas.width - offsetX;
+        const maxCols = Math.floor(availableWidth / spacing);
+        
+        // Center the grid horizontally
+        const totalGridWidth = maxCols * spacing;
+        const startX = offsetX + (canvas.width - totalGridWidth) / 2;
+        
+        const y = newStartY + row * hexHeight;
+        
+        for (let col = 0; col < maxCols; col++) {
+            const x = startX + col * spacing + CONFIG.BUBBLE_RADIUS;
+            
+            // Ensure bubble fits within canvas
+            if (x + CONFIG.BUBBLE_RADIUS <= canvas.width && x - CONFIG.BUBBLE_RADIUS >= 0) {
+                const color = availableColors[Math.floor(Math.random() * availableColors.length)];
+                gameState.bubbles.push(new Bubble(x, y, color, col, row));
+            }
+        }
+    }
+    
+    // Update initial top Y to reflect new top position
+    gameState.initialTopY = newStartY;
+    
+    draw();
+    
+    // Return the new top Y position
+    return newStartY;
 }
 
 // Animate falling bubbles
@@ -965,47 +1177,73 @@ function animateFallingBubbles() {
     animate();
 }
 
-// Drawing functions
+// Drawing functions - optimized for performance
+let backgroundCache = null;
+let lastCanvasSize = { width: 0, height: 0 };
+
 function draw() {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw dark club background with subtle lighting
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Cache background if canvas size hasn't changed (performance optimization)
+    if (!backgroundCache || lastCanvasSize.width !== canvas.width || lastCanvasSize.height !== canvas.height) {
+        // Create offscreen canvas for background cache
+        const bgCanvas = document.createElement('canvas');
+        bgCanvas.width = canvas.width;
+        bgCanvas.height = canvas.height;
+        const bgCtx = bgCanvas.getContext('2d');
+        
+        // Draw dark club background with subtle lighting
+        bgCtx.fillStyle = '#000';
+        bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+        
+        // Add subtle ambient lighting effects (simplified on mobile)
+        const isMobile = isMobileDevice();
+        if (!isMobile) {
+            // Full lighting effects on desktop
+            const lightGradient1 = bgCtx.createRadialGradient(
+                bgCanvas.width * 0.2, bgCanvas.height * 0.3, 0,
+                bgCanvas.width * 0.2, bgCanvas.height * 0.3, bgCanvas.width * 0.8
+            );
+            lightGradient1.addColorStop(0, 'rgba(0, 255, 255, 0.05)');
+            lightGradient1.addColorStop(1, 'transparent');
+            bgCtx.fillStyle = lightGradient1;
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            
+            const lightGradient2 = bgCtx.createRadialGradient(
+                bgCanvas.width * 0.8, bgCanvas.height * 0.4, 0,
+                bgCanvas.width * 0.8, bgCanvas.height * 0.4, bgCanvas.width * 0.7
+            );
+            lightGradient2.addColorStop(0, 'rgba(255, 0, 255, 0.05)');
+            lightGradient2.addColorStop(1, 'transparent');
+            bgCtx.fillStyle = lightGradient2;
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            
+            const lightGradient3 = bgCtx.createRadialGradient(
+                bgCanvas.width * 0.5, bgCanvas.height * 0.1, 0,
+                bgCanvas.width * 0.5, bgCanvas.height * 0.1, bgCanvas.width * 0.6
+            );
+            lightGradient3.addColorStop(0, 'rgba(138, 43, 226, 0.04)');
+            lightGradient3.addColorStop(1, 'transparent');
+            bgCtx.fillStyle = lightGradient3;
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+        }
+        // Skip ambient lighting on mobile for better performance
+        
+        backgroundCache = bgCanvas;
+        lastCanvasSize = { width: canvas.width, height: canvas.height };
+    }
     
-    // Add subtle ambient lighting effects
-    const lightGradient1 = ctx.createRadialGradient(
-        canvas.width * 0.2, canvas.height * 0.3, 0,
-        canvas.width * 0.2, canvas.height * 0.3, canvas.width * 0.8
-    );
-    lightGradient1.addColorStop(0, 'rgba(0, 255, 255, 0.05)');
-    lightGradient1.addColorStop(1, 'transparent');
-    ctx.fillStyle = lightGradient1;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Draw cached background (much faster than redrawing gradients)
+    ctx.drawImage(backgroundCache, 0, 0);
     
-    const lightGradient2 = ctx.createRadialGradient(
-        canvas.width * 0.8, canvas.height * 0.4, 0,
-        canvas.width * 0.8, canvas.height * 0.4, canvas.width * 0.7
-    );
-    lightGradient2.addColorStop(0, 'rgba(255, 0, 255, 0.05)');
-    lightGradient2.addColorStop(1, 'transparent');
-    ctx.fillStyle = lightGradient2;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    const lightGradient3 = ctx.createRadialGradient(
-        canvas.width * 0.5, canvas.height * 0.1, 0,
-        canvas.width * 0.5, canvas.height * 0.1, canvas.width * 0.6
-    );
-    lightGradient3.addColorStop(0, 'rgba(138, 43, 226, 0.04)');
-    lightGradient3.addColorStop(1, 'transparent');
-    ctx.fillStyle = lightGradient3;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw all bubbles
+    // Draw all bubbles - batch operations for better performance
+    ctx.save();
     gameState.bubbles.forEach(bubble => bubble.draw());
+    ctx.restore();
     
     // Draw popping bubbles (with animation)
+    ctx.save();
     gameState.poppingBubbles.forEach(popBubble => {
         ctx.save();
         ctx.globalAlpha = popBubble.alpha;
@@ -1052,46 +1290,69 @@ function draw() {
         
         ctx.restore();
     });
+    ctx.restore();
     
     // Draw falling bubbles
+    ctx.save();
     gameState.fallingBubbles.forEach(bubble => bubble.draw());
+    ctx.restore();
     
     // Draw shooter
+    ctx.save();
     if (gameState.shooterBubble && !gameState.shooting) {
         gameState.shooterBubble.draw();
         
-        // Draw neon aim line - always visible
-        ctx.strokeStyle = '#00ffff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([8, 4]);
-        ctx.beginPath();
-        ctx.moveTo(gameState.shooterBubble.x, gameState.shooterBubble.y);
-        const lineLength = 200;
-        ctx.lineTo(
-            gameState.shooterBubble.x + Math.cos(aimAngle) * lineLength,
-            gameState.shooterBubble.y + Math.sin(aimAngle) * lineLength
-        );
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        // Add subtle glow to aim line
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
-        ctx.lineWidth = 4;
-        ctx.setLineDash([8, 4]);
-        ctx.beginPath();
-        ctx.moveTo(gameState.shooterBubble.x, gameState.shooterBubble.y);
-        ctx.lineTo(
-            gameState.shooterBubble.x + Math.cos(aimAngle) * lineLength,
-            gameState.shooterBubble.y + Math.sin(aimAngle) * lineLength
-        );
-        ctx.stroke();
-        ctx.setLineDash([]);
+        // Draw neon aim line - always visible (simplified on mobile)
+        const isMobile = isMobileDevice();
+        if (!isMobile) {
+            // Full glow effect on desktop
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 4]);
+            ctx.beginPath();
+            ctx.moveTo(gameState.shooterBubble.x, gameState.shooterBubble.y);
+            const lineLength = 200;
+            ctx.lineTo(
+                gameState.shooterBubble.x + Math.cos(aimAngle) * lineLength,
+                gameState.shooterBubble.y + Math.sin(aimAngle) * lineLength
+            );
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Add subtle glow to aim line
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([8, 4]);
+            ctx.beginPath();
+            ctx.moveTo(gameState.shooterBubble.x, gameState.shooterBubble.y);
+            ctx.lineTo(
+                gameState.shooterBubble.x + Math.cos(aimAngle) * lineLength,
+                gameState.shooterBubble.y + Math.sin(aimAngle) * lineLength
+            );
+            ctx.stroke();
+            ctx.setLineDash([]);
+        } else {
+            // Simplified aim line on mobile
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 4]);
+            ctx.beginPath();
+            ctx.moveTo(gameState.shooterBubble.x, gameState.shooterBubble.y);
+            const lineLength = 150;
+            ctx.lineTo(
+                gameState.shooterBubble.x + Math.cos(aimAngle) * lineLength,
+                gameState.shooterBubble.y + Math.sin(aimAngle) * lineLength
+            );
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
     }
     
     // Draw shooting bubble
     if (gameState.shooting && gameState.shooterBubble) {
         gameState.shooterBubble.draw();
     }
+    ctx.restore();
 }
 
 // Input handling
@@ -1215,15 +1476,28 @@ function endGame(won) {
     const message = document.getElementById('overlayMessage');
     const finalScore = document.getElementById('finalScore');
     
-    title.textContent = won ? 'You Win!' : 'Game Over';
-    finalScore.textContent = gameState.score;
-    overlay.classList.add('active');
+    if (won) {
+        // Advance to next level
+        gameState.level++;
+        title.textContent = `Level ${gameState.level - 1} Complete!`;
+        message.innerHTML = `Score: <span id="finalScore">${gameState.score}</span><br>Starting Level ${gameState.level}...`;
+        
+        // Auto-advance to next level after a short delay
+        setTimeout(() => {
+            overlay.classList.remove('active');
+            initGame(false); // Don't reset level, keep the new level
+        }, 2000);
+    } else {
+        title.textContent = 'Game Over';
+        message.innerHTML = `Final Score: <span id="finalScore">${gameState.score}</span><br>Level Reached: ${gameState.level}`;
+        overlay.classList.add('active');
+    }
 }
 
 // Restart button
 document.getElementById('restartButton').addEventListener('click', () => {
     document.getElementById('gameOverlay').classList.remove('active');
-    initGame();
+    initGame(true); // Reset level to 1
 });
 
 // Music will start when play button is clicked, so we don't need these handlers
@@ -1270,9 +1544,9 @@ if (playButton && playOverlay) {
         
         // Resume audio context for game sounds
         SoundManager.resumeContext();
+        
+        // Start game at level 1
+        initGame(true);
+        gameLoop();
     });
 }
-
-// Start game
-initGame();
-gameLoop();
