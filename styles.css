@@ -124,6 +124,7 @@ body::after {
 
 .game-container {
     position: relative;
+    top: -40px;
     width: 100%;
     max-width: 500px;
     background: #0a0a0a;
@@ -137,6 +138,14 @@ body::after {
     flex-direction: column;
     border: 1px solid rgba(0, 255, 255, 0.2);
     z-index: 1;
+    max-height: calc(100vh - 100px);
+}
+
+@media (max-width: 768px) {
+    .game-container {
+        max-height: calc(100vh - 50px);
+        border-radius: 15px;
+    }
 }
 
 .game-header {
@@ -411,87 +420,169 @@ body::after {
 }
 
 /* Mobile optimizations */
-@media (max-width: 480px) {
+@media (max-width: 768px) {
+    body {
+        padding: 5px;
+    }
+    
     .logo-container {
-        top: 10px;
-        padding: 0 10px;
+        top: 5px;
+        padding: 0 5px;
+        max-width: 100%;
     }
     
     .logo {
-        padding: 10px 20px;
+        padding: 8px 15px;
         gap: 1px;
+        border-width: 1px;
     }
     
     .logo-miami {
-        font-size: 20px;
-        letter-spacing: 3px;
+        font-size: 18px;
+        letter-spacing: 2px;
     }
     
     .logo-bubble {
-        font-size: 24px;
-        letter-spacing: 4px;
-    }
-    
-    .logo-shooter {
-        font-size: 20px;
+        font-size: 22px;
         letter-spacing: 3px;
     }
     
+    .logo-shooter {
+        font-size: 18px;
+        letter-spacing: 2px;
+    }
+    
+    .game-container {
+        max-width: 100%;
+        border-radius: 15px;
+    }
+    
     .game-header {
-        padding: 12px 15px;
-        font-size: 14px;
+        padding: 10px 12px;
+        font-size: 12px;
+        flex-wrap: nowrap;
+        gap: 8px;
+        justify-content: space-between;
+    }
+    
+    .score-display, .level-display {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .score-display, .level-display {
+        font-size: 12px;
+    }
+    
+    .music-toggle {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
     }
     
     .game-controls {
-        padding: 12px 15px;
+        padding: 10px 12px;
+        gap: 10px;
     }
     
     .next-bubble-label {
-        font-size: 14px;
+        font-size: 12px;
     }
     
     #nextBubbleCanvas {
-        width: 50px;
-        height: 50px;
+        width: 45px;
+        height: 45px;
+    }
+    
+    #gameCanvas {
+        min-height: 400px;
     }
     
     .overlay-content {
-        padding: 30px 20px;
+        padding: 25px 20px;
+        max-width: 95%;
     }
     
     .overlay-content h2 {
-        font-size: 24px;
+        font-size: 22px;
     }
     
     .overlay-content p {
-        font-size: 16px;
+        font-size: 14px;
     }
     
     .play-overlay-content {
-        padding: 40px 25px;
-    }
-    
-    .game-title {
-        font-size: 32px;
+        padding: 35px 20px;
     }
     
     .game-subtitle {
-        font-size: 16px;
-        margin-bottom: 30px;
+        font-size: 14px;
+        margin-bottom: 25px;
     }
     
     .btn-play {
-        padding: 18px 50px;
-        font-size: 20px;
-        min-width: 180px;
+        padding: 15px 40px;
+        font-size: 18px;
+        min-width: 160px;
     }
     
     .play-icon {
-        font-size: 28px;
+        font-size: 24px;
     }
     
     .play-text {
+        font-size: 18px;
+    }
+    
+    .btn-primary {
+        padding: 10px 25px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .logo-container {
+        top: 3px;
+    }
+    
+    .logo {
+        padding: 6px 12px;
+    }
+    
+    .logo-miami {
+        font-size: 16px;
+        letter-spacing: 1.5px;
+    }
+    
+    .logo-bubble {
         font-size: 20px;
+        letter-spacing: 2px;
+    }
+    
+    .logo-shooter {
+        font-size: 16px;
+        letter-spacing: 1.5px;
+    }
+    
+    .game-header {
+        padding: 8px 10px;
+        font-size: 11px;
+    }
+    
+    .game-controls {
+        padding: 8px 10px;
+    }
+    
+    #nextBubbleCanvas {
+        width: 40px;
+        height: 40px;
+    }
+    
+    #gameCanvas {
+        min-height: 350px;
     }
 }
 

@@ -1,10 +1,16 @@
+// Detect mobile device
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+           (window.innerWidth <= 768 && window.matchMedia("(pointer: coarse)").matches);
+}
+
 // Game Configuration
 const CONFIG = {
-    BUBBLE_RADIUS: 20,
-    ROWS: 10,
-    COLUMNS: 12,
+    BUBBLE_RADIUS: isMobileDevice() ? 18 : 20,
+    ROWS: isMobileDevice() ? 6 : 10, // Reduced rows for mobile
+    COLUMNS: isMobileDevice() ? 10 : 12, // Reduced columns for mobile
     COLORS: ['#00ffff', '#d946ef', '#8a2be2', '#00ff00', '#fde047', '#ff0000'], // Neon club colors: cyan, pink, blueviolet, green, yellow, red
-    SHOOTER_Y_OFFSET: 50,
+    SHOOTER_Y_OFFSET: isMobileDevice() ? 40 : 50,
     GRAVITY: 0.3,
     BUBBLE_SPEED: 8,
     WALL_BOUNCE: 0.8,
@@ -261,10 +267,16 @@ const nextCtx = nextCanvas.getContext('2d');
 function resizeCanvas() {
     const container = canvas.parentElement;
     const maxWidth = container.clientWidth;
-    const maxHeight = window.innerHeight - 300; // Account for header and controls
+    
+    // Better mobile height calculation
+    const isMobile = isMobileDevice();
+    const headerHeight = isMobile ? 50 : 60;
+    const controlsHeight = isMobile ? 60 : 80;
+    const logoHeight = isMobile ? 80 : 100;
+    const maxHeight = window.innerHeight - headerHeight - controlsHeight - logoHeight;
     
     canvas.width = maxWidth;
-    canvas.height = Math.min(maxHeight, 600);
+    canvas.height = Math.min(maxHeight, isMobile ? 500 : 600);
     
     // Redraw if game has started
     if (gameState.bubbles.length > 0) {
@@ -273,7 +285,21 @@ function resizeCanvas() {
 }
 
 resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener('resize', () => {
+    resizeCanvas();
+    // Recalculate mobile settings on resize (e.g., device rotation)
+    if (gameState.bubbles.length === 0) {
+        // Only update config if game hasn't started
+        const wasMobile = CONFIG.ROWS === 6;
+        const isNowMobile = isMobileDevice();
+        if (wasMobile !== isNowMobile) {
+            CONFIG.BUBBLE_RADIUS = isNowMobile ? 18 : 20;
+            CONFIG.ROWS = isNowMobile ? 6 : 10;
+            CONFIG.COLUMNS = isNowMobile ? 10 : 12;
+            CONFIG.SHOOTER_Y_OFFSET = isNowMobile ? 40 : 50;
+        }
+    }
+});
 
 // Bubble Class
 class Bubble {
